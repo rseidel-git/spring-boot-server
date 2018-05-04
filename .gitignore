@@ -85,6 +85,4 @@
 
 \.idea/workspace\.xml
 
-target/classes/Main\.class
-
-target/classes/server/ServerRunner\.class
+target
