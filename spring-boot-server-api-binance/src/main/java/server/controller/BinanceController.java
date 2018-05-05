@@ -39,6 +39,30 @@ public class BinanceController {
         return createResponse(result);
     }
 
+    @GetMapping("/getAllPrices")
+    public String getAllPrices() {
+        if (!isInit) {
+            warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
+            if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
+                createResponse("Failed to init");
+            }
+        }
+
+        final String result = client.getAllPrices().toString();
+        return createResponse(result);
+    }
+
+    @GetMapping("/getAllPricesUser")
+    public String getAllPricesUser(@RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
+        if (!doInit(apiKey, secretKey)) {
+            createResponse("Failed to init");
+        }
+
+        final String result = client.getAllPrices().toString();
+        isInit = false;
+        return createResponse(result);
+    }
+
     @GetMapping("/getTradesSymbol")
     public String getTradesSymbol(@RequestParam("symbol") String symbol) {
         if (!isInit) {
