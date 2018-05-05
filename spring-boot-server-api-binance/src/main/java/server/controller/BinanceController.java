@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -17,42 +18,88 @@ import java.util.Set;
 @RequestMapping("binance")
 public class BinanceController {
 
-    private BinanceApiRestClient client;
+    private static final String PARAM_NAME_API_KEY = "apiKey";
+    private static final String PARAM_NAME_SECRET_KEY = "secretKey";
 
-    public BinanceController() {
-        String apiKey = "s7wGM9XCoahDR1y2ffai2wvTmmgft8rEj4TTFhZXnG01ldy8LE79iB9yo4Zf1L1k";
-        String secret = "EvnTtjbYFq1gqUKf10mOqWS8zhL4HloNoKzyEWeQZZWltDwGEgO4oH0ufeL0qSPw";
-        BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance(apiKey, secret);
-        client = factory.newRestClient();
-        client.ping();//todo die if failed
+    private static final String DEFAULT_API_KEY = "s7wGM9XCoahDR1y2ffai2wvTmmgft8rEj4TTFhZXnG01ldy8LE79iB9yo4Zf1L1k";
+    private static final String DEFAULT_SECRET_KEY = "EvnTtjbYFq1gqUKf10mOqWS8zhL4HloNoKzyEWeQZZWltDwGEgO4oH0ufeL0qSPw";
+    public static final String WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT = "WARNING: Not initiated. Falling back to default.";
+
+    private BinanceApiRestClient client;
+    private List<String> warnings = new ArrayList<>();
+    private boolean isInit = false;
+
+    @GetMapping("/init")
+    public String init(@RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
+        if (!doInit(apiKey, secretKey)) {
+            createResponse("Failed to init :-(");
+        }
+
+        final String result = "Initialized successfully!";
+        return createResponse(result);
     }
 
-    @GetMapping("/")
-    public String price(@RequestParam("symbol") String coin) {
-        if (coin == null) {
-            return "failed to get price! Bad request";
+    @GetMapping("/getTradesSymbol")
+    public String getTradesSymbol(@RequestParam("symbol") String symbol) {
+        if (!isInit) {
+            warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
+            if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
+                createResponse("Failed to init");
+            }
         }
-        if (coin.toLowerCase().equals("all")) {
-            return client.getAllPrices().toString();
+
+        final String result = client.getMyTrades(symbol).toString();
+        return createResponse(result);
+    }
+
+    @GetMapping("/getUserTradesSymbol")
+    public String getUserTradesSymbol(@RequestParam("symbol") String symbol, @RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
+        if (!doInit(apiKey, secretKey)) {
+            createResponse("Failed to init");
         }
-        else {
+
+        final String result = client.getMyTrades(symbol).toString();
+        isInit = false;
+        return createResponse(result);
+    }
+
+    @GetMapping("/getPrice")
+    public String getPrice(@RequestParam("symbol") String symbol) {
+        if (!isInit) {
+            warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
+            if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
+                createResponse("Failed to init");
+            }
+        }
+
+        String result;
+        if (symbol.toLowerCase().equals("all")) {
+            result = client.getAllPrices().toString();
+        } else {
             TickerPrice price;
             try {
-                price = client.getPrice(coin);
+                price = client.getPrice(symbol);
             } catch (Exception e) {
                 return "failed to get price!\n\n" + e.getMessage();
             }
             if (price == null) {
-                return "no such coin!";
+                result = "no such symbol!";
             } else {
-                return price.toString();
+                result = price.toString();
             }
-
         }
+
+        return createResponse(result);
     }
 
     @GetMapping("/supported")
     public String supported() {
+        if (!isInit) {
+            warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
+            if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
+                createResponse("Failed to init");
+            }
+        }
         List<TickerPrice> allPrices = client.getAllPrices();
         Set<String> allSymbols = new HashSet<>();
         for (TickerPrice price : allPrices) {
@@ -72,6 +119,21 @@ public class BinanceController {
         }
 
         return allSymbols.toString();
+    }
+
+    private boolean doInit(String apiKey, String secretKey) {
+        BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance(apiKey, secretKey);
+        client = factory.newRestClient();
+        client.ping();//todo die if failed
+        isInit = true;
+
+        return true;
+    }
+
+    private String createResponse(String result) {
+        final String message = warnings.isEmpty() ? result : warnings.toString() + "\n\n" + result;
+        warnings.clear();
+        return message;
     }
 
 }
