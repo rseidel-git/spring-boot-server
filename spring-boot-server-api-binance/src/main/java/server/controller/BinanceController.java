@@ -67,8 +67,8 @@ public class BinanceController {
         return createResponse(result, status);
     }
 
-    @GetMapping("/getAllPricesUser")
-    public ResponseEntity<String> getAllPricesUser(@RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
+    @GetMapping("/getAllUserPrices")
+    public ResponseEntity<String> getAllUserPrices(@RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
         if (!doInit(apiKey, secretKey)) {
             createResponse(MESSAGE_FAILED_TO_INIT, HttpStatus.INTERNAL_SERVER_ERROR);
         }
