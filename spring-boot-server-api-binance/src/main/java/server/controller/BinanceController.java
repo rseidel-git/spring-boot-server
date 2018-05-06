@@ -4,6 +4,8 @@ package server.controller;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.domain.market.TickerPrice;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -23,141 +25,194 @@ public class BinanceController {
 
     private static final String DEFAULT_API_KEY = "s7wGM9XCoahDR1y2ffai2wvTmmgft8rEj4TTFhZXnG01ldy8LE79iB9yo4Zf1L1k";
     private static final String DEFAULT_SECRET_KEY = "EvnTtjbYFq1gqUKf10mOqWS8zhL4HloNoKzyEWeQZZWltDwGEgO4oH0ufeL0qSPw";
-    public static final String WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT = "WARNING: Not initiated. Falling back to default.";
+    private static final String WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT = "WARNING: Not initiated. Falling back to default.";
+    private static final String MESSAGE_FAILED_TO_INIT = "Failed to init";
+    private static final String MESSAGE_INIT_SUCCESS = "Initialized successfully";
 
     private BinanceApiRestClient client;
     private List<String> warnings = new ArrayList<>();
     private boolean isInit = false;
 
+    private static String getCurrentMethodName() {
+        return Thread.currentThread().getStackTrace()[2].getMethodName();
+    }
+
     @GetMapping("/init")
-    public String init(@RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
+    public ResponseEntity<String> init(@RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
         if (!doInit(apiKey, secretKey)) {
-            createResponse("Failed to init :-(");
+            createResponse(MESSAGE_FAILED_TO_INIT, HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
-        final String result = "Initialized successfully!";
-        return createResponse(result);
+        return createResponse(MESSAGE_INIT_SUCCESS, HttpStatus.OK);
     }
 
     @GetMapping("/getAllPrices")
-    public String getAllPrices() {
+    public ResponseEntity<String> getAllPrices() {
         if (!isInit) {
             warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
             if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
-                createResponse("Failed to init");
-            }
-        }
-
-        final String result = client.getAllPrices().toString();
-        return createResponse(result);
-    }
-
-    @GetMapping("/getAllPricesUser")
-    public String getAllPricesUser(@RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
-        if (!doInit(apiKey, secretKey)) {
-            createResponse("Failed to init");
-        }
-
-        final String result = client.getAllPrices().toString();
-        isInit = false;
-        return createResponse(result);
-    }
-
-    @GetMapping("/getTradesSymbol")
-    public String getTradesSymbol(@RequestParam("symbol") String symbol) {
-        if (!isInit) {
-            warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
-            if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
-                createResponse("Failed to init");
-            }
-        }
-
-        final String result = client.getMyTrades(symbol).toString();
-        return createResponse(result);
-    }
-
-    @GetMapping("/getUserTradesSymbol")
-    public String getUserTradesSymbol(@RequestParam("symbol") String symbol, @RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
-        if (!doInit(apiKey, secretKey)) {
-            createResponse("Failed to init");
-        }
-
-        final String result = client.getMyTrades(symbol).toString();
-        isInit = false;
-        return createResponse(result);
-    }
-
-    @GetMapping("/getPrice")
-    public String getPrice(@RequestParam("symbol") String symbol) {
-        if (!isInit) {
-            warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
-            if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
-                createResponse("Failed to init");
+                createResponse(MESSAGE_FAILED_TO_INIT, HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }
 
         String result;
-        if (symbol.toLowerCase().equals("all")) {
+        HttpStatus status;
+        try {
             result = client.getAllPrices().toString();
-        } else {
-            TickerPrice price;
-            try {
-                price = client.getPrice(symbol);
-            } catch (Exception e) {
-                return "failed to get price!\n\n" + e.getMessage();
-            }
-            if (price == null) {
-                result = "no such symbol!";
-            } else {
-                result = price.toString();
-            }
+            status = HttpStatus.OK;
+        } catch (Exception e) {
+           result =  "failed to " + getCurrentMethodName() + ".\n\n\n" + e.getMessage();
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
         }
-
-        return createResponse(result);
+        return createResponse(result, status);
     }
 
-    @GetMapping("/supported")
-    public String supported() {
+    @GetMapping("/getAllPricesUser")
+    public ResponseEntity<String> getAllPricesUser(@RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
+        if (!doInit(apiKey, secretKey)) {
+            createResponse(MESSAGE_FAILED_TO_INIT, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        String result;
+        HttpStatus status;
+        try {
+            result = client.getAllPrices().toString();
+            status = HttpStatus.OK;
+        } catch (Exception e) {
+           result =  "failed to " + getCurrentMethodName() + ".\n\n\n" + e.getMessage();
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        isInit = false;
+        return createResponse(result, status);
+    }
+
+    @GetMapping("/getTradesSymbol")
+    public ResponseEntity<String> getTradesSymbol(@RequestParam("symbol") String symbol) {
         if (!isInit) {
             warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
             if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
-                createResponse("Failed to init");
+                createResponse(MESSAGE_FAILED_TO_INIT, HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }
-        List<TickerPrice> allPrices = client.getAllPrices();
-        Set<String> allSymbols = new HashSet<>();
-        for (TickerPrice price : allPrices) {
-            String symbol = price.getSymbol();
-            try {
-                allSymbols.add(symbol.substring(0, 3));
-            } catch (Exception ignored) {}
-            try {
-                allSymbols.add(symbol.substring(0, 4));
-            } catch (Exception ignored) {}
-            try {
-                allSymbols.add(symbol.substring(symbol.length() - 3));
-            } catch (Exception ignored) {}
-            try {
-                allSymbols.add(symbol.substring(symbol.length() - 4));
-            } catch (Exception ignored) {}
+
+        String result;
+        HttpStatus status;
+        try {
+            result = client.getMyTrades(symbol).toString();
+            status = HttpStatus.OK;
+        } catch (Exception e) {
+           result =  "failed to " + getCurrentMethodName() + ".\n\n\n" + e.getMessage();
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        return createResponse(result, status);
+    }
+
+    @GetMapping("/getUserTradesSymbol")
+    public ResponseEntity<String> getUserTradesSymbol(@RequestParam("symbol") String symbol, @RequestParam(PARAM_NAME_API_KEY) String apiKey, @RequestParam(PARAM_NAME_SECRET_KEY) String secretKey) {
+        if (!doInit(apiKey, secretKey)) {
+            createResponse(MESSAGE_FAILED_TO_INIT, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        String result;
+        HttpStatus status;
+        try {
+            result = client.getMyTrades(symbol).toString();
+            status = HttpStatus.OK;
+            isInit = false;
+        }
+        catch (Exception e) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+            result =  "failed to " + getCurrentMethodName() + ".\n\n\n" + e.getMessage();
+        }
+        return createResponse(result, status);
+    }
+
+    @GetMapping("/getPrice")
+    public ResponseEntity<String> getPrice(@RequestParam("symbol") String symbol) {
+        if (!isInit) {
+            warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
+            if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
+                createResponse(MESSAGE_FAILED_TO_INIT, HttpStatus.INTERNAL_SERVER_ERROR);
+            }
         }
 
-        return allSymbols.toString();
+        String result;
+        HttpStatus status;
+        try {
+            if (symbol.toLowerCase().equals("all")) {
+                result = client.getAllPrices().toString();
+            } else {
+                TickerPrice price;
+
+                price = client.getPrice(symbol);
+                if (price == null) {
+                    result = "no such symbol!";
+                } else {
+                    result = price.toString();
+                }
+            }
+            status = HttpStatus.OK;
+        } catch (Exception e) {
+           result =  "failed to " + getCurrentMethodName() + ".\n\n\n" + e.getMessage();
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+
+
+        return createResponse(result, status);
+    }
+
+    @GetMapping("/supported")
+    public ResponseEntity<String> supported() {
+        if (!isInit) {
+            warnings.add(WARNING_NOT_INITIATED_FALLING_BACK_TO_DEFAULT);
+            if (!doInit(DEFAULT_API_KEY, DEFAULT_SECRET_KEY)) {
+                createResponse(MESSAGE_FAILED_TO_INIT, HttpStatus.OK);
+            }
+        }
+        List<TickerPrice> allPrices;
+        String result;
+        HttpStatus status;
+        try {
+            allPrices = client.getAllPrices();
+            Set<String> allSymbols = new HashSet<>();
+            for (TickerPrice price : allPrices) {
+                String symbol = price.getSymbol();
+                try {
+                    allSymbols.add(symbol.substring(0, 3));
+                } catch (Exception ignored) {}
+                try {
+                    allSymbols.add(symbol.substring(0, 4));
+                } catch (Exception ignored) {}
+                try {
+                    allSymbols.add(symbol.substring(symbol.length() - 3));
+                } catch (Exception ignored) {}
+                try {
+                    allSymbols.add(symbol.substring(symbol.length() - 4));
+                } catch (Exception ignored) {}
+            }
+            result = allSymbols.toString();
+            status = HttpStatus.OK;
+        } catch (Exception e) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+            result =  "failed to " + getCurrentMethodName() + ".\n\n\n" + e.getMessage();
+        }
+
+
+        return createResponse(result, status);
     }
 
     private boolean doInit(String apiKey, String secretKey) {
-        BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance(apiKey, secretKey);
-        client = factory.newRestClient();
+        BinanceApiClientFactory binanceApiClientFactory = BinanceApiClientFactory.newInstance(apiKey, secretKey);
+        client = binanceApiClientFactory.newRestClient();
         client.ping();//todo die if failed
         isInit = true;
 
         return true;
     }
 
-    private String createResponse(String result) {
+    private ResponseEntity<String> createResponse(String result, HttpStatus httpStatus) {
         final String message = warnings.isEmpty() ? result : warnings.toString() + "\n\n" + result;
         warnings.clear();
-        return message;
+        return ResponseEntity.status(httpStatus).body(message);
     }
 
 }
