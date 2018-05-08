@@ -21,7 +21,6 @@
         <mockito.version>2.7.22</mockito.version>
     </properties>
 
-
     <modules>
         <module>spring-boot-server-runner</module>
         <module>spring-boot-server-api-home</module>
